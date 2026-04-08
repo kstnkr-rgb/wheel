@@ -366,7 +366,7 @@ let ALL_PRIZES = [];
 
 const REMOVAL_COSTS = [5, 10];
 const ITEM_H        = 72;   // px — must match CSS --ITEM_H
-const WIN_IDX       = 48;   // where winner is placed in reel list
+const ROTATIONS     = 4;    // full passes before the winner lands
 
 /* Dynamic center slot — computed after layout */
 let CENTER_SLOT = 2;
@@ -415,13 +415,20 @@ function pickWinner() {
 }
 
 function buildReel(winner) {
-  const pool = activePrizes();
-  const TOTAL = WIN_IDX + ITEM_H + 4;
+  const pool  = activePrizes();
+  const block = shuffle(pool); // one shuffled pass — no repeats within block
+
+  // Repeat the same block ROTATIONS times
   const items = [];
-  for (let i = 0; i < TOTAL; i++) {
-    items.push(i === WIN_IDX ? winner : pool[Math.floor(Math.random() * pool.length)]);
-  }
-  return items;
+  for (let r = 0; r < ROTATIONS; r++) items.push(...block);
+  // Add a tail so the reel doesn't end right at the winner
+  items.push(...block.slice(0, CENTER_SLOT + 3));
+
+  // Winner's natural position in the last full rotation (no swap needed)
+  const posInBlock = block.findIndex(p => p.id === winner.id);
+  const winIdx     = (ROTATIONS - 1) * pool.length + posInBlock;
+
+  return { items, winIdx };
 }
 
 function renderReel(items) {
@@ -440,8 +447,8 @@ function renderReel(items) {
 }
 
 function showIdleReel() {
-  const pool = activePrizes();
-  const items = shuffle(pool).concat(shuffle(pool)).concat(shuffle(pool)).slice(0, 20);
+  const block = shuffle(activePrizes());
+  const items = [...block, ...block].slice(0, block.length + CENTER_SLOT + 3);
   renderReel(items);
 }
 
@@ -491,11 +498,11 @@ function doSpin() {
   state.spins--;
   updateUI();
 
-  const winner  = pickWinner();
-  const items   = buildReel(winner);
+  const winner           = pickWinner();
+  const { items, winIdx } = buildReel(winner);
   renderReel(items);
 
-  const targetY  = -(WIN_IDX - CENTER_SLOT) * ITEM_H;
+  const targetY  = -(winIdx - CENTER_SLOT) * ITEM_H;
   const duration = 4500;
 
   // Fire entire haptic pattern NOW — we're still inside the user gesture
