@@ -1,0 +1,802 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Колесо удачи — Клуб Друзей</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --bg:      #13082E;
+      --card:    #1E1040;
+      --card2:   #2A1A5E;
+      --gold:    #F5A623;
+      --text:    #FFFFFF;
+      --muted:   rgba(255,255,255,0.5);
+      --red:     #E8272A;
+      --green:   #27AE60;
+      --ITEM_H:  72px;
+    }
+    html, body { height: 100%; overflow: hidden; background: var(--bg); color: var(--text);
+      font-family: -apple-system, 'Helvetica Neue', sans-serif; }
+    #app { max-width: 420px; margin: 0 auto; height: 100%;
+      display: flex; flex-direction: column; overflow: hidden; }
+
+    /* ── HEADER ── */
+    .hdr { padding: 18px 20px 10px; display: flex; align-items: center; justify-content: space-between; }
+    .hdr-title { font-size: 19px; font-weight: 700; }
+    .hdr-title span { color: var(--gold); }
+    .bkd-btn { display: flex; align-items: center; gap: 6px;
+      background: var(--card2); border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 20px; padding: 8px 14px; font-size: 14px; font-weight: 600;
+      color: var(--text); cursor: pointer; }
+    #bkdVal { transition: color 0.3s; }
+    #bkdVal.flash { color: var(--red); }
+
+    /* ── SPIN COUNTER (above drum) ── */
+    .spin-info { text-align: center; padding: 2px 0 8px; }
+    .spin-label { font-size: 13px; color: var(--muted); }
+    .spin-val   { font-size: 36px; font-weight: 900; line-height: 1.1; }
+
+    /* ── DRUM ── */
+    .drum-section { flex: 1; min-height: 0; display: flex; flex-direction: column;
+      align-items: center; padding: 0 16px 10px; }
+
+    .drum-outer {
+      position: relative;
+      width: 100%; max-width: 360px;
+      flex: 1; min-height: 0;
+      display: flex; flex-direction: column;
+    }
+
+    /* Side arrow indicators */
+    .drum-arrows {
+      position: absolute; top: 50%; transform: translateY(-50%);
+      width: calc(100% + 28px); left: -14px;
+      display: flex; justify-content: space-between;
+      pointer-events: none; z-index: 10;
+    }
+    .drum-arrow {
+      width: 26px; height: 40px;
+      display: flex; align-items: center; justify-content: center;
+      background: linear-gradient(135deg, rgba(245,166,35,0.25), rgba(245,166,35,0.08));
+      border: 1px solid rgba(245,166,35,0.4);
+      border-radius: 8px;
+      font-size: 13px; color: var(--gold);
+      filter: drop-shadow(0 0 6px rgba(245,166,35,0.5));
+    }
+
+    /* ── DRUM WINDOW ── */
+    .drum-window {
+      flex: 1;
+      overflow: hidden;
+      border-radius: 16px;
+      border: 2px solid rgba(245,166,35,0.45);
+      background: #0c0620;
+      position: relative;
+      box-shadow:
+        inset 8px 0 24px rgba(0,0,0,0.7),
+        inset -8px 0 24px rgba(0,0,0,0.7),
+        0 0 0 3px rgba(245,166,35,0.08),
+        0 8px 40px rgba(0,0,0,0.5);
+    }
+
+    /* Strong top/bottom fade — simulates drum curvature */
+    .drum-window::before, .drum-window::after {
+      content: ''; position: absolute; left: 0; right: 0; z-index: 3; pointer-events: none;
+    }
+    .drum-window::before {
+      top: 0; height: calc(var(--ITEM_H) * 2.2);
+      background: linear-gradient(to bottom,
+        #0c0620 0%,
+        rgba(12,6,32,0.85) 40%,
+        rgba(12,6,32,0.4) 75%,
+        transparent 100%);
+    }
+    .drum-window::after {
+      bottom: 0; height: calc(var(--ITEM_H) * 2.2);
+      background: linear-gradient(to top,
+        #0c0620 0%,
+        rgba(12,6,32,0.85) 40%,
+        rgba(12,6,32,0.4) 75%,
+        transparent 100%);
+    }
+
+    /* Center winner highlight — bright golden band */
+    .drum-highlight {
+      position: absolute; z-index: 4; pointer-events: none;
+      height: var(--ITEM_H);
+      left: 0; right: 0;
+      /* top set dynamically by JS */
+      border-top:    2px solid rgba(245,166,35,0.9);
+      border-bottom: 2px solid rgba(245,166,35,0.9);
+      background: linear-gradient(to right,
+        rgba(245,166,35,0.08) 0%,
+        rgba(245,166,35,0.18) 50%,
+        rgba(245,166,35,0.08) 100%);
+      box-shadow:
+        0  2px 16px rgba(245,166,35,0.25),
+        0 -2px 16px rgba(245,166,35,0.25),
+        inset 0 0 30px rgba(245,166,35,0.06);
+    }
+
+    #drumInner { display: flex; flex-direction: column; will-change: transform; }
+
+    .drum-item {
+      height: var(--ITEM_H); flex-shrink: 0;
+      display: flex; align-items: center; justify-content: center; gap: 12px;
+      border-bottom: 1px solid rgba(255,255,255,0.04);
+      padding: 0 16px;
+    }
+    .drum-item-emoji { font-size: 28px; flex-shrink: 0; }
+    .drum-item-name  { font-size: 15px; font-weight: 600;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 200px; }
+
+    /* ── BOTTOM ── */
+    .bottom { padding: 10px 24px 36px; display: flex; flex-direction: column;
+      align-items: center; gap: 10px; }
+
+    .btn-spin {
+      width: 100%; max-width: 300px; padding: 19px;
+      background: linear-gradient(135deg, #F5A623 0%, #E8272A 100%);
+      border: none; border-radius: 18px; color: #fff;
+      font-size: 20px; font-weight: 800; letter-spacing: 0.4px;
+      cursor: pointer; box-shadow: 0 8px 28px rgba(232,39,42,0.35);
+      transition: transform 0.1s, opacity 0.2s;
+    }
+    .btn-spin:active { transform: scale(0.97); }
+    .btn-spin:disabled { background: #2a2a3a; box-shadow: none; opacity: 0.45; cursor: not-allowed; transform: none; }
+
+    .btn-row { display: flex; gap: 10px; width: 100%; max-width: 300px; }
+    .btn-sec {
+      flex: 1; background: transparent;
+      border: 1px solid rgba(255,255,255,0.15); border-radius: 12px;
+      color: var(--muted); font-size: 13px; padding: 10px 8px;
+      cursor: pointer; text-align: center; transition: border-color 0.2s, color 0.2s;
+    }
+    .btn-sec:hover { border-color: rgba(255,255,255,0.35); color: var(--text); }
+    .btn-sec:disabled { opacity: 0.3; cursor: not-allowed; }
+
+    /* no-spins */
+    .no-spins { display: none; background: var(--card2); border-radius: 16px;
+      padding: 18px; width: 100%; max-width: 300px; flex-direction: column; gap: 9px; }
+    .no-spins h3 { font-size: 15px; color: var(--gold); margin-bottom: 2px; }
+    .tip { font-size: 13px; color: var(--muted); line-height: 1.5;
+      display: flex; gap: 8px; }
+    .tip-arrow { color: #7B3FE4; font-weight: 700; flex-shrink: 0; }
+
+    /* ── OVERLAYS ── */
+    .overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.82);
+      display: flex; align-items: flex-end; justify-content: center;
+      z-index: 200; opacity: 0; pointer-events: none; transition: opacity 0.25s; }
+    .overlay.open { opacity: 1; pointer-events: all; }
+    .sheet { background: linear-gradient(175deg, var(--card2), var(--bg));
+      border-radius: 24px 24px 0 0; padding: 28px 24px 44px;
+      width: 100%; max-width: 420px;
+      transform: translateY(100%); transition: transform 0.3s cubic-bezier(.32,1.1,.5,1); }
+    .overlay.open .sheet { transform: translateY(0); }
+
+    .sheet-handle { width: 40px; height: 4px; background: rgba(255,255,255,0.2);
+      border-radius: 2px; margin: 0 auto 20px; }
+
+    /* ── RESULT MODAL ── */
+    .result-emoji { font-size: 68px; display: block; text-align: center;
+      margin-bottom: 10px; animation: popIn 0.4s cubic-bezier(.36,1.6,.5,1); }
+    @keyframes popIn { 0%{transform:scale(0) rotate(-10deg)} 100%{transform:scale(1) rotate(0)} }
+    .result-name { text-align: center; font-size: 22px; font-weight: 800; margin-bottom: 6px; }
+    .result-desc { text-align: center; font-size: 14px; color: var(--muted);
+      line-height: 1.5; margin-bottom: 22px; }
+
+    /* discount info box (no code) */
+    .discount-box { background: rgba(245,166,35,0.12); border: 1px solid rgba(245,166,35,0.3);
+      border-radius: 14px; padding: 14px 18px; text-align: center; margin-bottom: 18px; }
+    .discount-box-val { font-size: 32px; font-weight: 900; color: var(--gold); }
+    .discount-box-note { font-size: 12px; color: var(--muted); margin-top: 4px; }
+
+    /* physical prize box (barcode) */
+    .code-box { background: #fff; border-radius: 14px; padding: 16px;
+      text-align: center; margin-bottom: 18px; }
+    .code-val { font-size: 22px; font-weight: 800; letter-spacing: 3px;
+      font-family: monospace; color: #222; }
+    .code-exp { font-size: 12px; color: #999; margin-top: 4px; }
+
+    .share-hint { text-align: center; font-size: 13px; color: var(--muted); margin-bottom: 10px; }
+
+    .btn-modal { width: 100%; padding: 15px; border: none; border-radius: 14px;
+      font-size: 16px; font-weight: 700; cursor: pointer; margin-bottom: 10px;
+      transition: opacity 0.15s; }
+    .btn-modal:active { opacity: 0.8; }
+    .btn-share { background: var(--card2); border: 1px solid rgba(255,255,255,0.15);
+      color: var(--text); display: flex; align-items: center; justify-content: center; gap: 8px; }
+    .btn-primary-grad { background: linear-gradient(135deg, #F5A623, #E8272A); color: #fff; }
+    .btn-ghost { background: transparent; color: var(--muted); font-size: 15px; }
+
+    /* ── MY PRIZES ── */
+    .panel-title { font-size: 18px; font-weight: 800; margin-bottom: 4px; }
+    .panel-sub   { font-size: 13px; color: var(--muted); margin-bottom: 18px; }
+    .prizes-list { max-height: 60vh; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
+    .prize-card { background: var(--card); border-radius: 14px; padding: 14px 16px;
+      display: flex; align-items: center; gap: 14px; }
+    .prize-card-emoji { font-size: 30px; flex-shrink: 0; }
+    .prize-card-info { flex: 1; }
+    .prize-card-name { font-size: 15px; font-weight: 700; }
+    .prize-card-time { font-size: 12px; color: var(--muted); margin-top: 2px; }
+    .prize-card-badge { font-size: 11px; font-weight: 700; padding: 3px 8px;
+      border-radius: 6px; background: rgba(39,174,96,0.2); color: var(--green); }
+    .empty-state { text-align: center; color: var(--muted); font-size: 15px;
+      padding: 40px 0; }
+
+    /* ── REMOVE SEGMENTS ── */
+    .seg-list { max-height: 58vh; overflow-y: auto; margin-bottom: 16px; }
+    .seg-item { display: flex; align-items: center; justify-content: space-between;
+      padding: 12px 0; border-bottom: 1px solid rgba(255,255,255,0.06); }
+    .seg-item.removed { opacity: 0.35; }
+    .seg-left { display: flex; align-items: center; gap: 10px; font-size: 14px; }
+    .seg-badge { font-size: 11px; background: #333; color: var(--muted);
+      border-radius: 4px; padding: 2px 6px; margin-left: 4px; }
+    .btn-del { background: rgba(255,80,80,0.12); border: 1px solid rgba(255,80,80,0.25);
+      border-radius: 8px; color: #FF6B6B; font-size: 13px;
+      padding: 6px 12px; cursor: pointer; white-space: nowrap; transition: background 0.2s; }
+    .btn-del:hover { background: rgba(255,80,80,0.22); }
+    .btn-del:disabled { opacity: 0.35; cursor: not-allowed; }
+
+    /* ── TOAST ── */
+    .toast { position: fixed; bottom: 88px; left: 50%;
+      transform: translateX(-50%) translateY(12px);
+      background: #2a2a3a; color: #fff; padding: 10px 20px;
+      border-radius: 10px; font-size: 14px; white-space: nowrap;
+      opacity: 0; pointer-events: none;
+      transition: opacity 0.25s, transform 0.25s; z-index: 400; }
+    .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+    /* ── WIN GLOW ── */
+    @keyframes winGlow { 0%,100%{box-shadow:0 0 0 transparent} 50%{box-shadow:0 0 40px 8px rgba(245,166,35,0.5)} }
+    .drum-outer.glowing .drum-window { animation: winGlow 0.55s ease 2; }
+
+    /* Swipe hint — subtle pulse on first load */
+    @keyframes swipeHint { 0%{opacity:0;transform:translateY(6px)} 60%{opacity:1;transform:translateY(0)} 100%{opacity:0;transform:translateY(-4px)} }
+    .swipe-hint { position: absolute; bottom: 8px; left: 50%; transform: translateX(-50%);
+      z-index: 5; font-size: 11px; color: rgba(255,255,255,0.3); pointer-events: none;
+      animation: swipeHint 2s ease 1.5s 2 forwards; }
+  </style>
+</head>
+<body>
+<div id="app">
+
+  <!-- HEADER -->
+  <div class="hdr">
+    <div class="hdr-title">Колесо <span>удачи</span></div>
+    <button class="bkd-btn" onclick="openRemove()">
+      💎 <span id="bkdVal">150</span> БКД
+    </button>
+  </div>
+
+  <!-- SPIN COUNTER — above drum -->
+  <div class="spin-info">
+    <div class="spin-label">доступных спинов</div>
+    <div class="spin-val" id="spinVal">3</div>
+  </div>
+
+  <!-- DRUM SECTION -->
+  <div class="drum-section">
+    <div class="drum-outer" id="drumOuter">
+      <div class="drum-arrows">
+        <div class="drum-arrow">▶</div>
+        <div class="drum-arrow">◀</div>
+      </div>
+      <div class="drum-window" id="drumWindow">
+        <div class="drum-highlight" id="drumHighlight"></div>
+        <div id="drumInner"></div>
+        <div class="swipe-hint">↑ свайп для кручения</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- BOTTOM -->
+  <div class="bottom">
+    <button class="btn-spin" id="btnSpin" onclick="doSpin()">Крутить!</button>
+
+    <div class="btn-row">
+      <button class="btn-sec" id="btnRemove" onclick="openRemove()">✕ Убрать приз</button>
+      <button class="btn-sec" onclick="openMyPrizes()">🏆 Мои призы</button>
+    </div>
+
+    <div class="no-spins" id="noSpins">
+      <h3>Как получить спины?</h3>
+      <div class="tip"><span class="tip-arrow">→</span> Потрать 1 000 ₽ через KD Pay — получи спин</div>
+      <div class="tip"><span class="tip-arrow">→</span> Подключи КД Премиум — 2 спина за тысячу</div>
+      <div class="tip"><span class="tip-arrow">→</span> Поделись результатом и получи спин</div>
+    </div>
+  </div>
+
+</div><!-- /app -->
+
+<!-- RESULT MODAL -->
+<div class="overlay" id="resultModal">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <span class="result-emoji" id="rEmoji">🎁</span>
+    <div class="result-name" id="rName">Приз</div>
+    <div class="result-desc" id="rDesc">Описание</div>
+    <div id="rDiscountBox" class="discount-box" style="display:none">
+      <div class="discount-box-val" id="rDiscountVal">20%</div>
+      <div class="discount-box-note">Скидка применится автоматически при оплате через KD Pay</div>
+    </div>
+    <div id="rCodeBox" class="code-box" style="display:none">
+      <div class="code-val" id="rCode">LUCK-0000</div>
+      <div class="code-exp">Предъявите на кассе · Действует 7 дней</div>
+    </div>
+    <div class="share-hint">Поделись и получи ещё один спин 🎁</div>
+    <button class="btn-modal btn-share" onclick="doShare()">📤 Поделиться результатом</button>
+    <button class="btn-modal btn-primary-grad" id="btnAgain" onclick="closeResult();doSpin()">Крутить ещё!</button>
+    <button class="btn-modal btn-ghost" onclick="closeResult()">Закрыть</button>
+  </div>
+</div>
+
+<!-- MY PRIZES -->
+<div class="overlay" id="myPrizesPanel">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="panel-title">🏆 Мои призы</div>
+    <div class="panel-sub">Призы этой игровой сессии</div>
+    <div class="prizes-list" id="prizesList"></div>
+    <button class="btn-modal btn-ghost" style="margin-top:16px" onclick="closeOverlay('myPrizesPanel')">Закрыть</button>
+  </div>
+</div>
+
+<!-- REMOVE PANEL -->
+<div class="overlay" id="removePanel">
+  <div class="sheet">
+    <div class="sheet-handle"></div>
+    <div class="panel-title">Убрать приз с колеса</div>
+    <div class="panel-sub">Повысь шанс на ценный приз: 1-е удаление — 5 БКД, 2-е — 10 БКД.</div>
+    <div class="seg-list" id="segList"></div>
+    <button class="btn-modal btn-primary-grad" onclick="closeRemove()">← Назад к колесу</button>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ══════════════════════════════════════════════
+   ДАННЫЕ — все 20 призов из ТЗ
+══════════════════════════════════════════════ */
+const ALL_PRIZES = [
+  { id:1,  name:'Жетон на iPhone',         emoji:'📱', weight:30, kind:'info',
+    desc:'Участие в еженедельном розыгрыше iPhone 17' },
+  { id:2,  name:'Предсказание',             emoji:'🔮', weight:28, kind:'info',
+    desc:'Одно из тысячи предсказаний-пожеланий' },
+  { id:3,  name:'Кофе в подарок',           emoji:'☕', weight:4,  kind:'code',
+    desc:'Бесплатный кофе — предъявите код на кассе' },
+  { id:4,  name:'Скидка 10%',               emoji:'🏷️', weight:10, kind:'discount', discountVal:'10%',
+    desc:'Честная скидка 10% на любую покупку' },
+  { id:5,  name:'Скидка 15%',               emoji:'💸', weight:8,  kind:'discount', discountVal:'15%',
+    desc:'Честная скидка 15% на любую покупку' },
+  { id:6,  name:'Скидка 20%',               emoji:'🎁', weight:5,  kind:'discount', discountVal:'20%',
+    desc:'Честная скидка 20% на любую покупку' },
+  { id:7,  name:'Скидка 25%',               emoji:'🤑', weight:3,  kind:'discount', discountVal:'25%',
+    desc:'Честная скидка 25% на любую покупку' },
+  { id:8,  name:'Скидка 30%',               emoji:'💎', weight:2,  kind:'discount', discountVal:'30%',
+    desc:'Честная скидка 30% на любую покупку' },
+  { id:9,  name:'10 бонусов БКД',           emoji:'⭐', weight:9,  kind:'info',
+    desc:'Бонусы начислены на счёт (на любую покупку)' },
+  { id:10, name:'50 бонусов БКД',           emoji:'🌟', weight:5,  kind:'info',
+    desc:'Бонусы начислены на счёт (от 500 ₽)' },
+  { id:11, name:'100 бонусов БКД',          emoji:'✨', weight:2,  kind:'info',
+    desc:'Бонусы начислены на счёт (от 1 000 ₽)' },
+  { id:12, name:'300 бонусов БКД',          emoji:'💫', weight:1,  kind:'info',
+    desc:'Бонусы начислены на счёт (от 3 000 ₽)' },
+  { id:13, name:'Мандарины бесплатно',      emoji:'🍊', weight:2,  kind:'code',
+    desc:'Фасованные мандарины — предъявите код на кассе' },
+  { id:14, name:'Скидка сладкое 30%',       emoji:'🍬', weight:5,  kind:'discount', discountVal:'30%',
+    desc:'Скидка 30% на категорию «Сладкие подарки»' },
+  { id:15, name:'Скидка консервы 30%',      emoji:'🥫', weight:5,  kind:'discount', discountVal:'30%',
+    desc:'Скидка 30% на категорию «Консервация»' },
+  { id:16, name:'Скидка напитки 30%',       emoji:'🥤', weight:5,  kind:'discount', discountVal:'30%',
+    desc:'Скидка 30% на категорию «Напитки»' },
+  { id:17, name:'Скидка бытхимия 30%',      emoji:'🧴', weight:5,  kind:'discount', discountVal:'30%',
+    desc:'Скидка 30% на категорию «Бытовая химия»' },
+  { id:18, name:'Скидка товары дома 30%',   emoji:'🏠', weight:5,  kind:'discount', discountVal:'30%',
+    desc:'Скидка 30% на категорию «Товары для дома»' },
+  { id:19, name:'+1 Спин',                  emoji:'🎰', weight:8,  kind:'spin', spinCount:1,
+    desc:'Дополнительная попытка вращения' },
+  { id:20, name:'+2 Спина',                 emoji:'🎲', weight:4,  kind:'spin', spinCount:2,
+    desc:'Две дополнительные попытки вращения' },
+];
+
+const REMOVAL_COSTS = [5, 10];
+const ITEM_H        = 72;   // px — must match CSS --ITEM_H
+const WIN_IDX       = 48;   // where winner is placed in reel list
+
+/* Dynamic center slot — computed after layout */
+let CENTER_SLOT = 2;
+
+function computeLayout() {
+  const win = document.getElementById('drumWindow');
+  const h   = win.clientHeight;
+  const visible = Math.floor(h / ITEM_H);
+  CENTER_SLOT = Math.floor(visible / 2);
+  document.getElementById('drumHighlight').style.top = (CENTER_SLOT * ITEM_H) + 'px';
+}
+
+/* ── STATE ── */
+let state = {
+  spins:        3,
+  bkd:          150,
+  spinning:     false,
+  removedIds:   [],
+  removalsUsed: 0,
+  wonPrizes:    [],
+  sharedToday:  false,
+};
+
+function activePrizes() {
+  return ALL_PRIZES.filter(p => !state.removedIds.includes(p.id));
+}
+
+/* ══════════════════════════════════════════════
+   REEL BUILDING
+══════════════════════════════════════════════ */
+function shuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function pickWinner() {
+  const pool = activePrizes();
+  const total = pool.reduce((s, p) => s + p.weight, 0);
+  let r = Math.random() * total;
+  for (const p of pool) { r -= p.weight; if (r <= 0) return p; }
+  return pool[pool.length - 1];
+}
+
+function buildReel(winner) {
+  const pool = activePrizes();
+  const TOTAL = WIN_IDX + ITEM_H + 4;
+  const items = [];
+  for (let i = 0; i < TOTAL; i++) {
+    items.push(i === WIN_IDX ? winner : pool[Math.floor(Math.random() * pool.length)]);
+  }
+  return items;
+}
+
+function renderReel(items) {
+  const inner = document.getElementById('drumInner');
+  inner.innerHTML = '';
+  items.forEach(p => {
+    const el = document.createElement('div');
+    el.className = 'drum-item';
+    el.innerHTML = `
+      <div class="drum-item-emoji">${p.emoji}</div>
+      <div class="drum-item-name">${p.name}</div>`;
+    inner.appendChild(el);
+  });
+  inner.style.transition = 'none';
+  inner.style.transform  = 'translateY(0)';
+}
+
+function showIdleReel() {
+  const pool = activePrizes();
+  const items = shuffle(pool).concat(shuffle(pool)).concat(shuffle(pool)).slice(0, 20);
+  renderReel(items);
+}
+
+/* ══════════════════════════════════════════════
+   HAPTIC
+══════════════════════════════════════════════ */
+function haptic(pattern) {
+  try { navigator.vibrate && navigator.vibrate(pattern); } catch(e) {}
+}
+
+/* Pre-compute the full tick pattern and fire it in one call.
+   Must be called within a user gesture (onclick/touchend). */
+function hapticSpin(totalDistancePx, duration) {
+  const totalItems = Math.floor(totalDistancePx / ITEM_H);
+  const pattern = [];
+  let prevMs = 0;
+
+  for (let n = 1; n < totalItems; n++) {
+    const ratio = (n * ITEM_H) / totalDistancePx;
+    // Inverse of cubic easeOut: t = 1 - cbrt(1 - ratio)
+    const t  = 1 - Math.pow(1 - ratio, 1 / 3);
+    const ms = Math.round(t * duration);
+    const gap = ms - prevMs;
+    if (gap >= 18) {
+      pattern.push(14);            // vibrate 14ms
+      pattern.push(gap - 14);      // pause until next tick
+      prevMs = ms;
+    }
+  }
+
+  haptic(pattern);
+
+  // Win bump — scheduled after animation ends
+  setTimeout(() => haptic([55, 45, 110]), duration + 400);
+}
+
+/* ══════════════════════════════════════════════
+   ANIMATION
+══════════════════════════════════════════════ */
+function easeOut(t) {
+  return 1 - Math.pow(1 - t, 3);
+}
+
+function doSpin() {
+  if (state.spinning || state.spins <= 0) return;
+  state.spinning = true;
+  state.spins--;
+  updateUI();
+
+  const winner  = pickWinner();
+  const items   = buildReel(winner);
+  renderReel(items);
+
+  const targetY  = -(WIN_IDX - CENTER_SLOT) * ITEM_H;
+  const duration = 4500;
+
+  // Fire entire haptic pattern NOW — we're still inside the user gesture
+  hapticSpin(Math.abs(targetY), duration);
+
+  const inner     = document.getElementById('drumInner');
+  const startTime = performance.now();
+
+  function frame(now) {
+    const t     = Math.min((now - startTime) / duration, 1);
+    const eased = easeOut(t);
+    inner.style.transform = `translateY(${targetY * eased}px)`;
+
+    if (t < 1) {
+      requestAnimationFrame(frame);
+    } else {
+      inner.style.transform = `translateY(${targetY}px)`;
+      state.spinning = false;
+      onSpinComplete(winner);
+    }
+  }
+  requestAnimationFrame(frame);
+}
+
+function onSpinComplete(winner) {
+  haptic([50, 40, 100]); // double-bump win feel
+
+  const outer = document.getElementById('drumOuter');
+  outer.classList.add('glowing');
+  setTimeout(() => outer.classList.remove('glowing'), 1200);
+
+  if (winner.kind === 'spin') state.spins += winner.spinCount;
+  if (winner.id === 9)  state.bkd += 10;
+  if (winner.id === 10) state.bkd += 50;
+  if (winner.id === 11) state.bkd += 100;
+  if (winner.id === 12) state.bkd += 300;
+
+  state.wonPrizes.unshift({ ...winner, wonAt: new Date() });
+  state.removedIds   = [];
+  state.removalsUsed = 0;
+  updateUI();
+
+  setTimeout(() => {
+    showResult(winner);
+    setTimeout(() => showIdleReel(), 400);
+  }, 350);
+}
+
+/* ══════════════════════════════════════════════
+   SWIPE GESTURE on drum → spin
+══════════════════════════════════════════════ */
+(function initSwipe() {
+  const win = document.getElementById('drumWindow');
+  let touchStartY = null;
+  let touchStartTime = null;
+
+  win.addEventListener('touchstart', e => {
+    touchStartY    = e.touches[0].clientY;
+    touchStartTime = Date.now();
+  }, { passive: true });
+
+  win.addEventListener('touchend', e => {
+    if (touchStartY === null) return;
+    const dy       = touchStartY - e.changedTouches[0].clientY; // positive = swipe up
+    const dt       = Date.now() - touchStartTime;
+    touchStartY    = null;
+    touchStartTime = null;
+
+    const isSwipeUp = dy > 40 && dt < 600;
+    if (isSwipeUp) doSpin();
+  }, { passive: true });
+})();
+
+/* ══════════════════════════════════════════════
+   RESULT MODAL
+══════════════════════════════════════════════ */
+function showResult(p) {
+  document.getElementById('rEmoji').textContent = p.emoji;
+  document.getElementById('rName').textContent  = p.name;
+  document.getElementById('rDesc').textContent  = p.desc;
+
+  const discBox = document.getElementById('rDiscountBox');
+  const codeBox = document.getElementById('rCodeBox');
+  discBox.style.display = 'none';
+  codeBox.style.display = 'none';
+
+  if (p.kind === 'discount') {
+    document.getElementById('rDiscountVal').textContent = p.discountVal;
+    discBox.style.display = 'block';
+  } else if (p.kind === 'code') {
+    const code = 'LUCK-' + Math.floor(1000 + Math.random() * 9000);
+    document.getElementById('rCode').textContent = code;
+    codeBox.style.display = 'block';
+  }
+
+  document.getElementById('btnAgain').style.display = state.spins > 0 ? 'block' : 'none';
+  openOverlay('resultModal');
+}
+
+function closeResult() { closeOverlay('resultModal'); updateUI(); }
+
+function doShare() {
+  closeOverlay('resultModal');
+  if (!state.sharedToday) {
+    state.sharedToday = true;
+    state.spins++;
+    showToast('📤 Поделился! +1 спин начислен');
+  } else {
+    showToast('Сегодня шеринг-спин уже получен');
+  }
+  updateUI();
+}
+
+/* ══════════════════════════════════════════════
+   MY PRIZES
+══════════════════════════════════════════════ */
+function openMyPrizes() {
+  const list = document.getElementById('prizesList');
+  if (state.wonPrizes.length === 0) {
+    list.innerHTML = '<div class="empty-state">Пока нет выигранных призов.<br>Крутите колесо! 🎰</div>';
+  } else {
+    list.innerHTML = state.wonPrizes.map(p => {
+      const time = p.wonAt.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+      return `<div class="prize-card">
+        <div class="prize-card-emoji">${p.emoji}</div>
+        <div class="prize-card-info">
+          <div class="prize-card-name">${p.name}</div>
+          <div class="prize-card-time">Сегодня в ${time}</div>
+        </div>
+        <div class="prize-card-badge">Активен</div>
+      </div>`;
+    }).join('');
+  }
+  openOverlay('myPrizesPanel');
+}
+
+/* ══════════════════════════════════════════════
+   REMOVE PANEL
+══════════════════════════════════════════════ */
+function openRemove() {
+  if (state.spinning) return;
+  renderSegList();
+  openOverlay('removePanel');
+}
+
+function closeRemove() {
+  closeOverlay('removePanel');
+  showIdleReel();
+}
+
+function renderSegList() {
+  const list = document.getElementById('segList');
+  const cost = state.removalsUsed < REMOVAL_COSTS.length ? REMOVAL_COSTS[state.removalsUsed] : null;
+
+  list.innerHTML = ALL_PRIZES.map(p => {
+    const isRemoved = state.removedIds.includes(p.id);
+    const canRemove = !isRemoved && cost !== null && state.bkd >= cost;
+    return `<div class="seg-item ${isRemoved ? 'removed' : ''}">
+      <div class="seg-left">
+        <span>${p.emoji}</span>
+        <span>${p.name}</span>
+        ${isRemoved ? '<span class="seg-badge">убран</span>' : ''}
+      </div>
+      ${isRemoved
+        ? ''
+        : cost !== null
+          ? `<button class="btn-del" onclick="removeSegment(${p.id})" ${canRemove ? '' : 'disabled'}>${cost} БКД</button>`
+          : '<span style="font-size:12px;color:var(--muted)">макс.</span>'
+      }
+    </div>`;
+  }).join('');
+}
+
+function removeSegment(id) {
+  if (state.removalsUsed >= 2) return;
+  const cost = REMOVAL_COSTS[state.removalsUsed];
+  if (state.bkd < cost) { showToast('Недостаточно БКД'); return; }
+
+  state.bkd -= cost;
+  state.removedIds.push(id);
+  state.removalsUsed++;
+
+  flashBkd();
+  renderSegList();
+  updateUI();
+  showToast('Приз убран — шансы пересчитаны');
+}
+
+/* ══════════════════════════════════════════════
+   OVERLAY HELPERS
+══════════════════════════════════════════════ */
+function openOverlay(id)  { document.getElementById(id).classList.add('open'); }
+function closeOverlay(id) { document.getElementById(id).classList.remove('open'); }
+
+/* ══════════════════════════════════════════════
+   UI UPDATE
+══════════════════════════════════════════════ */
+function updateUI() {
+  document.getElementById('spinVal').textContent = state.spins;
+  document.getElementById('bkdVal').textContent  = state.bkd;
+
+  const btnSpin   = document.getElementById('btnSpin');
+  const noSpins   = document.getElementById('noSpins');
+  const btnRemove = document.getElementById('btnRemove');
+
+  if (state.spins > 0) {
+    btnSpin.style.display  = 'block';
+    btnSpin.disabled       = state.spinning;
+    noSpins.style.display  = 'none';
+  } else {
+    btnSpin.style.display  = 'none';
+    noSpins.style.display  = 'flex';
+  }
+
+  const nextCost = state.removalsUsed < REMOVAL_COSTS.length
+    ? REMOVAL_COSTS[state.removalsUsed] : null;
+  if (state.removalsUsed >= 2 || state.spins === 0) {
+    btnRemove.disabled    = true;
+    btnRemove.textContent = state.removalsUsed >= 2 ? '✕ Максимум убрано' : '✕ Убрать приз';
+  } else {
+    btnRemove.disabled    = state.spinning;
+    btnRemove.textContent = `✕ Убрать приз (${nextCost} БКД)`;
+  }
+}
+
+function flashBkd() {
+  const el = document.getElementById('bkdVal');
+  el.classList.add('flash');
+  setTimeout(() => el.classList.remove('flash'), 600);
+}
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2600);
+}
+
+/* ══════════════════════════════════════════════
+   DEBUG: tap title 3× → +3 spins +50 BKD
+══════════════════════════════════════════════ */
+let _taps = 0, _tapT;
+document.querySelector('.hdr-title').addEventListener('click', () => {
+  _taps++; clearTimeout(_tapT);
+  _tapT = setTimeout(() => _taps = 0, 500);
+  if (_taps >= 3) { _taps = 0; state.spins += 3; state.bkd += 50;
+    showToast('+3 спина и +50 БКД (демо)'); updateUI(); }
+});
+
+/* ── INIT ── */
+// Wait for layout to settle, then compute center slot
+requestAnimationFrame(() => {
+  computeLayout();
+  showIdleReel();
+  updateUI();
+});
+
+window.addEventListener('resize', () => {
+  computeLayout();
+  showIdleReel();
+});
+</script>
+</body>
+</html>
