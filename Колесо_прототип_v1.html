@@ -359,50 +359,10 @@
 
 <script>
 /* ══════════════════════════════════════════════
-   ДАННЫЕ — все 20 призов из ТЗ
+   ДАННЫЕ — загружаются из prizes.json
 ══════════════════════════════════════════════ */
-const ALL_PRIZES = [
-  { id:1,  name:'Жетон на iPhone',         emoji:'📱', weight:30, kind:'info',
-    desc:'Участие в еженедельном розыгрыше iPhone 17' },
-  { id:2,  name:'Предсказание',             emoji:'🔮', weight:28, kind:'info',
-    desc:'Одно из тысячи предсказаний-пожеланий' },
-  { id:3,  name:'Кофе в подарок',           emoji:'☕', weight:4,  kind:'code',
-    desc:'Бесплатный кофе — предъявите код на кассе' },
-  { id:4,  name:'Скидка 10%',               emoji:'🏷️', weight:10, kind:'discount', discountVal:'10%',
-    desc:'Честная скидка 10% на любую покупку' },
-  { id:5,  name:'Скидка 15%',               emoji:'💸', weight:8,  kind:'discount', discountVal:'15%',
-    desc:'Честная скидка 15% на любую покупку' },
-  { id:6,  name:'Скидка 20%',               emoji:'🎁', weight:5,  kind:'discount', discountVal:'20%',
-    desc:'Честная скидка 20% на любую покупку' },
-  { id:7,  name:'Скидка 25%',               emoji:'🤑', weight:3,  kind:'discount', discountVal:'25%',
-    desc:'Честная скидка 25% на любую покупку' },
-  { id:8,  name:'Скидка 30%',               emoji:'💎', weight:2,  kind:'discount', discountVal:'30%',
-    desc:'Честная скидка 30% на любую покупку' },
-  { id:9,  name:'10 бонусов БКД',           emoji:'⭐', weight:9,  kind:'info',
-    desc:'Бонусы начислены на счёт (на любую покупку)' },
-  { id:10, name:'50 бонусов БКД',           emoji:'🌟', weight:5,  kind:'info',
-    desc:'Бонусы начислены на счёт (от 500 ₽)' },
-  { id:11, name:'100 бонусов БКД',          emoji:'✨', weight:2,  kind:'info',
-    desc:'Бонусы начислены на счёт (от 1 000 ₽)' },
-  { id:12, name:'300 бонусов БКД',          emoji:'💫', weight:1,  kind:'info',
-    desc:'Бонусы начислены на счёт (от 3 000 ₽)' },
-  { id:13, name:'Мандарины бесплатно',      emoji:'🍊', weight:2,  kind:'code',
-    desc:'Фасованные мандарины — предъявите код на кассе' },
-  { id:14, name:'Скидка сладкое 30%',       emoji:'🍬', weight:5,  kind:'discount', discountVal:'30%',
-    desc:'Скидка 30% на категорию «Сладкие подарки»' },
-  { id:15, name:'Скидка консервы 30%',      emoji:'🥫', weight:5,  kind:'discount', discountVal:'30%',
-    desc:'Скидка 30% на категорию «Консервация»' },
-  { id:16, name:'Скидка напитки 30%',       emoji:'🥤', weight:5,  kind:'discount', discountVal:'30%',
-    desc:'Скидка 30% на категорию «Напитки»' },
-  { id:17, name:'Скидка бытхимия 30%',      emoji:'🧴', weight:5,  kind:'discount', discountVal:'30%',
-    desc:'Скидка 30% на категорию «Бытовая химия»' },
-  { id:18, name:'Скидка товары дома 30%',   emoji:'🏠', weight:5,  kind:'discount', discountVal:'30%',
-    desc:'Скидка 30% на категорию «Товары для дома»' },
-  { id:19, name:'+1 Спин',                  emoji:'🎰', weight:8,  kind:'spin', spinCount:1,
-    desc:'Дополнительная попытка вращения' },
-  { id:20, name:'+2 Спина',                 emoji:'🎲', weight:4,  kind:'spin', spinCount:2,
-    desc:'Две дополнительные попытки вращения' },
-];
+let ALL_PRIZES = [];
+
 
 const REMOVAL_COSTS = [5, 10];
 const ITEM_H        = 72;   // px — must match CSS --ITEM_H
@@ -786,17 +746,34 @@ document.querySelector('.hdr-title').addEventListener('click', () => {
 });
 
 /* ── INIT ── */
-// Wait for layout to settle, then compute center slot
-requestAnimationFrame(() => {
-  computeLayout();
-  showIdleReel();
-  updateUI();
-});
+async function init() {
+  const btnSpin = document.getElementById('btnSpin');
+  btnSpin.disabled = true;
+  btnSpin.textContent = 'Загрузка...';
+
+  try {
+    const res = await fetch('prizes.json');
+    if (!res.ok) throw new Error(res.status);
+    ALL_PRIZES = await res.json();
+  } catch (e) {
+    showToast('Не удалось загрузить призы');
+    btnSpin.textContent = 'Крутить!';
+    return;
+  }
+
+  requestAnimationFrame(() => {
+    computeLayout();
+    showIdleReel();
+    updateUI();
+  });
+}
 
 window.addEventListener('resize', () => {
   computeLayout();
   showIdleReel();
 });
+
+init();
 </script>
 </body>
 </html>
